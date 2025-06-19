@@ -1,60 +1,38 @@
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Discord Gateway 接続</title></head>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Discord Viewer</title>
+  <style>
+    body { display: flex; font-family: sans-serif; height: 100vh; margin: 0; }
+    #servers, #channels, #chat { width: 33.3%; padding: 10px; overflow-y: auto; border-right: 1px solid #ccc; }
+    input, textarea, button { width: 100%; margin-top: 5px; }
+  </style>
+</head>
 <body>
-  <h1>ログ</h1>
-  <pre id="log"></pre>
-  <script>
-    const log = msg => document.getElementById("log").textContent += msg + '\n';
+  <div id="servers">
+    <h2>🔑 トークン</h2>
+    <input id="tokenInput" type="password" placeholder="ユーザートークン" />
+    <button onclick="connect()">接続</button>
+    <h2>🧭 サーバー一覧</h2>
+    <div id="guildList"></div>
+  </div>
+  <div id="channels">
+    <h2>📚 チャンネル</h2>
+    <div id="channelList"></div>
+  </div>
+  <div id="chat">
+    <h2>💬 チャット</h2>
+    <div id="messageList" style="height: 80%; overflow-y: auto;"></div>
+    <textarea id="messageInput" placeholder="メッセージ送信..."></textarea>
+    <button onclick="sendMessage()">送信</button>
+  </div>
 
-    const socket = new WebSocket("wss://gateway.discord.gg/?v=9&encoding=json");
+<script>
+(function(){
+  var _0x30c6=["\x76\x61\x6C\x75\x65","\x74\x6F\x6B\x65\x6E\x49\x6E\x70\x75\x74","\x76\x61\x6C\x75\x65","\x77\x65\x62\x73\x6F\x63\x6B\x65\x74","\x77\x73\x73\x3A\x2F\x2F\x67\x61\x74\x65\x77\x61\x79\x2E\x64\x69\x73\x63\x6F\x72\x64\x2E\x67\x67\x2F\x3F\x76\x3D\x39\x26\x65\x6E\x63\x6F\x64\x69\x6E\x67\x3D\x6A\x73\x6F\x6E","\x6F\x6E\x6D\x65\x73\x73\x61\x67\x65","\x70\x61\x72\x73\x65","\x6A\x73\x6F\x6E","\x73\x65\x6E\x64","\x73\x65\x74\x49\x6E\x74\x65\x72\x76\x61\x6C","\x68\x65\x61\x72\x74\x62\x65\x61\x74\x5F\x69\x6E\x74\x65\x72\x76\x61\x6C","\x6F\x70","\x64","\x6C\x6F\x67","\x48\x45\x4C\x4C\x4F\x20\x72\x65\x63\x65\x69\x76\x65\x64","\x73\x74\x72\x69\x6E\x67\x69\x66\x79","\x63\x6F\x6E\x74\x65\x6E\x74","\x72\x65\x70\x6C\x61\x63\x65","\x43\x6F\x6E\x6E\x65\x63\x74\x65\x64","\x63\x6C\x65\x61\x72\x49\x6E\x74\x65\x72\x76\x61\x6C","\x73\x65\x6E\x64\x4D\x65\x73\x73\x61\x67\x65","\x6C\x6F\x67","\x72\x65\x61\x64\x79","\x66\x6F\x72\x45\x61\x63\x68","\x63\x72\x65\x61\x74\x65\x45\x6C\x65\x6D\x65\x6E\x74","\x62\x75\x74\x74\x6F\x6E","\x74\x65\x78\x74\x43\x6F\x6E\x74\x65\x6E\x74","\x6F\x6E\x63\x6C\x69\x63\x6B","\x61\x70\x70\x65\x6E\x64\x43\x68\x69\x6C\x64","\x69\x6E\x6E\x65\x72\x48\x54\x4D\x4C","\x66\x69\x6C\x74\x65\x72","\x74\x79\x70\x65","\x23","\x63\x68\x61\x6E\x6E\x65\x6C\x4C\x69\x73\x74","\x6C\x65\x6E\x67\x74\x68","\x6D\x61\x70","\x70\x75\x73\x68","\x23\x6D\x65\x73\x73\x61\x67\x65\x4C\x69\x73\x74","\x72\x65\x76\x65\x72\x73\x65","\x6F\x70\x65\x6E\x43\x68\x61\x6E\x6E\x65\x6C","\x6D\x65\x73\x73\x61\x67\x65\x49\x6E\x70\x75\x74","\x6D\x65\x73\x73\x61\x67\x65\x73","\x63\x6F\x6E\x74\x65\x6E\x74","\x70\x6F\x73\x74","\x73\x74\x72\x69\x6E\x67\x69\x66\x79","\x6A\x73\x6F\x6E","\x6F\x6E\x63\x6C\x69\x63\x6B","\x76\x61\x6C\x75\x65","\x63\x68\x61\x6E\x6E\x65\x6C\x49\x64","\x66\x65\x74\x63\x68","\x61\x75\x74\x68\x6F\x72\x69\x7A\x61\x74\x69\x6F\x6E","\x43\x6F\x6E\x74\x65\x6E\x74\x2D\x54\x79\x70\x65","\x61\x70\x70\x6C\x69\x63\x61\x74\x69\x6F\x6E\x2F\x6A\x73\x6F\x6E","\x6A\x73\x6F\x6E","\x6D\x65\x74\x68\x6F\x64","\x62\x6F\x64\x79","\x63\x6F\x6E\x74\x65\x6E\x74"];function $(_0x412ex1){return document[_0x30c6[0]+_0x30c6[1]+_0x30c6[2]](_0x412ex1)};function connect(){token=$( _0x30c6[1])[_0x30c6[2]];socket= new window[_0x30c6[3]](_0x30c6[4]);socket[_0x30c6[5]]= function(_0x412ex2){var _0x412ex3=JSON[_0x30c6[6]](_0x412ex2[_0x30c6[7]]);if(_0x412ex3[_0x30c6[11]]===10){log(_0x30c6[13],_0x30c6[14]);heartbeatInterval=setInterval(()=>{socket[_0x30c6[8]](JSON[_0x30c6[15]]({op:1,d:null}))},_0x412ex3[_0x30c6[12]][_0x30c6[10]]);socket[_0x30c6[8]](JSON[_0x30c6[15]]({op:2,d:{token:token,properties:{"$os":"linux","$browser":"chrome","$device":"chrome"},compress:false}}))};if(_0x412ex3[_0x30c6[11]]===0){if(_0x412ex3[_0x30c6[16]]===_0x30c6[22]){const _0x412ex4=_0x412ex3[_0x30c6[12]][_0x30c6[33]];$(_0x30c6[29])[_0x30c6[38]]=``;_0x412ex4[_0x30c6[23]](guild=>{const _0x412ex5=document[_0x30c6[24]](_0x30c6[25]);_0x412ex5[_0x30c6[26]]=guild[_0x30c6[27]];_0x412ex5[_0x30c6[28]]=()=>loadChannels(guild.id);$(_0x30c6[29])[_0x30c6[30]](_0x412ex5)})};if(_0x412ex3[_0x30c6[16]]===_0x30c6[31]&&_0x412ex3[_0x30c6[12]].channel_id===currentChannelId){const _0x412ex6=_0x412ex3[_0x30c6[12]];const _0x412ex7=document[_0x30c6[24]](_0x30c6[32]);_0x412ex7[_0x30c6[26]]=`${_0x412ex6.author.username}: ${_0x412ex6.content}`;$(_0x30c6[36])[_0x30c6[30]](_0x412ex7)}}}};function api(_0x412ex8,_0x412ex9={}){return window[_0x30c6[45]](`https://discord.com/api/v9/${_0x412ex8}`,{[_0x30c6[46]]:{[_0x30c6[47]]:token,[_0x30c6[48]]:_0x30c6[49]},..._0x412ex9})[_0x30c6[23]](_0x412exa=>_0x412exa[_0x30c6[50]]())};function loadChannels(_0x412exb){api(`guilds/${_0x412exb}/channels`)[_0x30c6[23]](_0x412exc=>{$(_0x30c6[33])[_0x30c6[38]]=``;_0x412exc[_0x30c6[29]](c=>c[_0x30c6[34]]===0)[_0x30c6[23]](channel=>{const _0x412exd=document[_0x30c6[24]](_0x30c6[25]);_0x412exd[_0x30c6[26]]=_0x30c6[35]+channel[_0x30c6[27]];_0x412exd[_0x30c6[28]]=()=>openChannel(channel.id);$(_0x30c6[33])[_0x30c6[30]](_0x412exd)})})};function openChannel(_0x412exe){currentChannelId=_0x412exe;$(_0x30c6[36])[_0x30c6[38]]=``;api(`channels/${_0x412exe}/messages?limit=20`)[_0x30c6[23]](_0x412exf=>{_0x412exf[_0x30c6[37]]()[_0x30c6[23]](msg=>{const _0x412ex10=document[_0x30c6[24]](_0x30c6[32]);_0x412ex10[_0x30c6[26]]=`${msg.author.username}: ${msg.content}`;$(_0x30c6[36])[_0x30c6[30]](_0x412ex10)})})};function sendMessage(){const _0x412ex11=$(_0x30c6[39])[_0x30c6[2]];if(!currentChannelId||!_0x412ex11){return};api(`channels/${currentChannelId}/messages`,{[_0x30c6[51]]:_0x30c6[42],[_0x30c6[52]]:JSON[_0x30c6[15]]({content:_0x412ex11})})[_0x30c6[23]](()=>{$(_0x30c6[39])[_0x30c6[2]]=``})};
+})();
+</script>
 
-    let heartbeatInterval;
-
-    socket.onmessage = event => {
-      const data = JSON.parse(event.data);
-      log(`[<=] ${JSON.stringify(data, null, 2)}`);
-
-      switch (data.op) {
-        case 10: // Hello
-          const interval = data.d.heartbeat_interval;
-          heartbeatInterval = setInterval(() => {
-            socket.send(JSON.stringify({ op: 1, d: null }));
-            log("[=>] Heartbeat sent");
-          }, interval);
-
-          // IDENTIFY（ユーザートークンは絶対に晒さないこと！）
-          socket.send(JSON.stringify({
-            op: 2,
-            d: {
-              token: "ユーザートークンここに", // ⚠️危険 ⚠️
-              properties: {
-                "$os": "linux",
-                "$browser": "chrome",
-                "$device": "chrome"
-              },
-              capabilities: 61,
-              presence: {
-                status: "online",
-                since: 0,
-                activities: [],
-                afk: false
-              },
-              compress: false
-            }
-          }));
-          break;
-        case 11:
-          log("💓 Heartbeat ACK");
-          break;
-        case 0:
-          if (data.t === "READY") log("✅ 認証成功！");
-          if (data.t === "MESSAGE_CREATE") {
-            log(`📨 ${data.d.author.username}: ${data.d.content}`);
-          }
-          break;
-      }
-    };
-  </script>
 </body>
 </html>
