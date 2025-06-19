@@ -1,19 +1,21 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>Discord Viewer with Debug Logs</title>
+  <meta charset="UTF-8">
+  <title>Discord Viewer v2</title>
   <style>
     body {
-      display: flex;
-      font-family: sans-serif;
-      height: 100vh;
+      font-family: "Segoe UI", sans-serif;
+      background: #f2f3f5;
+      color: #111;
       margin: 0;
+      height: 100vh;
+      display: flex;
       flex-direction: column;
     }
     #main {
-      display: flex;
       flex: 1;
+      display: flex;
       overflow: hidden;
     }
     #servers, #channels, #chat {
@@ -25,7 +27,19 @@
     #chat {
       border-right: none;
     }
-    input, textarea, button {
+    button {
+      background: #5865F2;
+      color: white;
+      border: none;
+      padding: 6px;
+      margin: 2px 0;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #4752c4;
+    }
+    textarea, input {
       width: 100%;
       margin-top: 5px;
       box-sizing: border-box;
@@ -33,15 +47,15 @@
     #logArea {
       height: 150px;
       overflow-y: auto;
-      background: #222;
-      color: #eee;
+      background: #1e1e1e;
+      color: #ccc;
+      font-size: 12px;
+      padding: 6px;
       font-family: monospace;
-      padding: 5px;
-      border-top: 2px solid #666;
+      border-top: 2px solid #444;
     }
     .error {
       color: #ff5555;
-      font-weight: bold;
     }
   </style>
 </head>
@@ -49,9 +63,9 @@
   <div id="main">
     <div id="servers">
       <h2>🔑 トークン</h2>
-      <input id="tokenInput" type="password" placeholder="ユーザートークンを入力" />
+      <input id="tokenInput" type="password" placeholder="ユーザートークン" />
       <button id="connectBtn">接続</button>
-      <h2>🧭 サーバー一覧</h2>
+      <h2>🧭 サーバー</h2>
       <div id="guildList"></div>
     </div>
     <div id="channels">
@@ -65,199 +79,161 @@
       <button id="sendBtn">送信</button>
     </div>
   </div>
-
   <div id="logArea"></div>
 
   <script>
-    const logArea = document.getElementById("logArea");
-    function log(msg, isError = false) {
-      const el = document.createElement("div");
-      el.textContent = msg;
-      if (isError) el.classList.add("error");
-      logArea.appendChild(el);
-      logArea.scrollTop = logArea.scrollHeight;
-      console.log(msg);
-    }
-
-    let socket = null;
-    let token = "";
-    let heartbeatInterval = null;
-    let currentChannelId = null;
-
-    function resetUI() {
-      document.getElementById("guildList").innerHTML = "";
-      document.getElementById("channelList").innerHTML = "";
-      document.getElementById("messageList").innerHTML = "";
-      currentChannelId = null;
-    }
-
-    function connect() {
-      resetUI();
-
-      token = document.getElementById("tokenInput").value.trim();
-      if (!token) {
-        log("⚠️ トークンを入力してください", true);
-        return;
-      }
-
-      log("🌐 Discord Gatewayに接続中...");
-      socket = new WebSocket("wss://gateway.discord.gg/?v=9&encoding=json");
-
-      socket.onerror = (e) => {
-        log("❌ WebSocketエラー: " + e.message || e.type, true);
-      };
-      socket.onclose = (e) => {
-        log(`🔴 接続が閉じられました (コード: ${e.code}, 理由: ${e.reason || "なし"})`, true);
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
-          heartbeatInterval = null;
-        }
+    (() => {
+      const logArea = document.getElementById("logArea");
+      const log = (msg, err = false) => {
+        const el = document.createElement("div");
+        el.textContent = msg;
+        if (err) el.classList.add("error");
+        logArea.appendChild(el);
+        logArea.scrollTop = logArea.scrollHeight;
       };
 
-      socket.onopen = () => {
-        log("✅ WebSocket接続成功");
-      };
+      let socket = null;
+      let token = "";
+      let heartbeatInterval = null;
+      let currentChannelId = null;
 
-      socket.onmessage = event => {
-        let data;
-        try {
-          data = JSON.parse(event.data);
-        } catch (e) {
-          log("⚠️ 受信データのJSONパース失敗", true);
-          return;
-        }
-        log(`[受信] OP:${data.op} イベント:${data.t || "なし"}`);
+      function connect() {
+        token = document.getElementById("tokenInput").value.trim();
+        if (!token) return log("⚠️ トークンを入力してください", true);
 
-        if (data.op === 10) {
-          // HELLO
-          log("🫀 HEARTBEAT開始 interval=" + data.d.heartbeat_interval + "ms");
+        socket = new WebSocket("wss://gateway.discord.gg/?v=9&encoding=json");
+        socket.onopen = () => log("🌐 接続成功！");
+        socket.onerror = (e) => log("❌ WebSocketエラー", true);
+        socket.onclose = (e) => {
+          log("🔴 接続終了", true);
           if (heartbeatInterval) clearInterval(heartbeatInterval);
-          heartbeatInterval = setInterval(() => {
-            socket.send(JSON.stringify({ op: 1, d: null }));
-            log("[送信] HEARTBEAT");
-          }, data.d.heartbeat_interval);
+        };
 
-          // IDENTIFY送信
-          const identifyPayload = {
-            op: 2,
-            d: {
-              token: token,
-              properties: {
-                "$os": "linux",
-                "$browser": "chrome",
-                "$device": "chrome"
-              },
-              compress: false
-            }
-          };
-          socket.send(JSON.stringify(identifyPayload));
-          log("[送信] IDENTIFY");
-        }
-
-        if (data.op === 11) {
-          log("🫀 HEARTBEAT ACK");
-        }
-
-        if (data.op === 0) {
-          switch(data.t) {
-            case "READY":
-              log("✅ 認証成功。サーバー一覧を取得しています...");
-              const guilds = data.d.guilds || [];
-              const guildList = document.getElementById("guildList");
-              guildList.innerHTML = "";
-              guilds.forEach(guild => {
-                const btn = document.createElement("button");
-                btn.textContent = guild.name || "(名前なし)";
-                btn.onclick = () => loadChannels(guild.id);
-                guildList.appendChild(btn);
-              });
-              break;
-
-            case "MESSAGE_CREATE":
-              if (data.d.channel_id === currentChannelId) {
-                const msg = data.d;
-                const div = document.createElement("div");
-                div.textContent = `${msg.author.username}: ${msg.content}`;
-                document.getElementById("messageList").appendChild(div);
-                // 自動スクロール
-                const ml = document.getElementById("messageList");
-                ml.scrollTop = ml.scrollHeight;
+        socket.onmessage = (event) => {
+          let data = JSON.parse(event.data);
+          if (data.op === 10) {
+            heartbeatInterval = setInterval(() => {
+              socket.send(JSON.stringify({ op: 1, d: null }));
+            }, data.d.heartbeat_interval);
+            socket.send(JSON.stringify({
+              op: 2,
+              d: {
+                token,
+                properties: {
+                  "$os": "linux",
+                  "$browser": "chrome",
+                  "$device": "chrome"
+                }
               }
-              break;
-
-            default:
-              // 他のイベントは必要に応じて追加
-              break;
+            }));
           }
-        }
-      };
-    }
 
-    function api(path, options = {}) {
-      return fetch(`https://discord.com/api/v9/${path}`, {
-        headers: {
-          Authorization: token,
-          "Content-Type": "application/json"
-        },
-        ...options
-      }).then(res => {
-        if (!res.ok) {
-          log(`❌ APIエラー ${res.status} ${res.statusText}`, true);
-          throw new Error(`APIエラー ${res.status}`);
-        }
-        return res.json();
-      });
-    }
+          if (data.op === 0) {
+            switch (data.t) {
+              case "READY":
+                log("✅ ログイン完了");
+                const guilds = data.d.guilds;
+                const guildList = document.getElementById("guildList");
+                guildList.innerHTML = "";
+                guilds.forEach(g => {
+                  const b = document.createElement("button");
+                  b.textContent = g.name;
+                  b.onclick = () => loadChannels(g.id);
+                  guildList.appendChild(b);
+                });
+                break;
 
-    function loadChannels(guildId) {
-      api(`guilds/${guildId}/channels`).then(channels => {
-        const channelList = document.getElementById("channelList");
-        channelList.innerHTML = "";
-        channels.filter(c => c.type === 0).forEach(channel => {
-          const btn = document.createElement("button");
-          btn.textContent = "#" + channel.name;
-          btn.onclick = () => openChannel(channel.id);
-          channelList.appendChild(btn);
-        });
-      }).catch(e => log("❌ チャンネル取得失敗: " + e.message, true));
-    }
+              case "CHANNEL_CREATE":
+                const chbtn = document.createElement("button");
+                chbtn.textContent = "#" + data.d.name;
+                chbtn.onclick = () => openChannel(data.d.id);
+                document.getElementById("channelList").appendChild(chbtn);
+                break;
 
-    function openChannel(channelId) {
-      currentChannelId = channelId;
-      const messageList = document.getElementById("messageList");
-      messageList.innerHTML = "";
-      api(`channels/${channelId}/messages?limit=20`).then(msgs => {
-        msgs.reverse().forEach(msg => {
-          const div = document.createElement("div");
-          div.textContent = `${msg.author.username}: ${msg.content}`;
-          messageList.appendChild(div);
-        });
-      }).catch(e => log("❌ メッセージ取得失敗: " + e.message, true));
-    }
+              case "MESSAGE_CREATE":
+                if (data.d.channel_id === currentChannelId) {
+                  const msg = document.createElement("div");
+                  msg.id = "msg-" + data.d.id;
+                  msg.textContent = `${data.d.author.username}: ${data.d.content}`;
+                  document.getElementById("messageList").appendChild(msg);
+                }
+                break;
 
-    function sendMessage() {
-      const input = document.getElementById("messageInput");
-      const content = input.value.trim();
-      if (!currentChannelId) {
-        log("⚠️ チャンネルを選択してください", true);
-        return;
+              case "MESSAGE_UPDATE":
+                const updated = document.getElementById("msg-" + data.d.id);
+                if (updated) updated.textContent = `(編集済) ${data.d.content}`;
+                break;
+
+              case "MESSAGE_DELETE":
+                const del = document.getElementById("msg-" + data.d.id);
+                if (del) {
+                  del.textContent = "(削除済みのメッセージ)";
+                  del.style.color = "#aaa";
+                }
+                break;
+
+              case "MESSAGE_REACTION_ADD":
+                const reacted = document.getElementById("msg-" + data.d.message_id);
+                if (reacted) reacted.textContent += ` ❤️ [${data.d.emoji.name}]`;
+                break;
+            }
+          }
+        };
       }
-      if (!content) {
-        log("⚠️ メッセージを入力してください", true);
-        return;
-      }
-      api(`channels/${currentChannelId}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ content })
-      }).then(() => {
-        input.value = "";
-        log("[送信] メッセージを送信しました");
-      }).catch(e => log("❌ メッセージ送信失敗: " + e.message, true));
-    }
 
-    // イベント設定
-    document.getElementById("connectBtn").onclick = connect;
-    document.getElementById("sendBtn").onclick = sendMessage;
+      function api(path, opts = {}) {
+        return fetch(`https://discord.com/api/v9/${path}`, {
+          ...opts,
+          headers: {
+            Authorization: token,
+            "Content-Type": "application/json"
+          }
+        }).then(r => r.json());
+      }
+
+      function loadChannels(guildId) {
+        api(`guilds/${guildId}/channels`).then(chs => {
+          const cl = document.getElementById("channelList");
+          cl.innerHTML = "";
+          chs.filter(c => c.type === 0).forEach(c => {
+            const b = document.createElement("button");
+            b.textContent = "#" + c.name;
+            b.onclick = () => openChannel(c.id);
+            cl.appendChild(b);
+          });
+        });
+      }
+
+      function openChannel(chId) {
+        currentChannelId = chId;
+        const msgList = document.getElementById("messageList");
+        msgList.innerHTML = "";
+        api(`channels/${chId}/messages?limit=20`).then(msgs => {
+          msgs.reverse().forEach(m => {
+            const div = document.createElement("div");
+            div.id = "msg-" + m.id;
+            div.textContent = `${m.author.username}: ${m.content}`;
+            msgList.appendChild(div);
+          });
+        });
+      }
+
+      function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const content = input.value.trim();
+        if (!currentChannelId || !content) return;
+        api(`channels/${currentChannelId}/messages`, {
+          method: "POST",
+          body: JSON.stringify({ content })
+        }).then(() => {
+          input.value = "";
+          log("📤 メッセージ送信");
+        });
+      }
+
+      document.getElementById("connectBtn").onclick = connect;
+      document.getElementById("sendBtn").onclick = sendMessage;
+    })();
   </script>
 </body>
 </html>
