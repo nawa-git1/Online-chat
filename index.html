@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Discord Gateway 接続</title></head>
+<body>
+  <h1>ログ</h1>
+  <pre id="log"></pre>
+  <script>
+    const log = msg => document.getElementById("log").textContent += msg + '\n';
+
+    const socket = new WebSocket("wss://gateway.discord.gg/?v=9&encoding=json");
+
+    let heartbeatInterval;
+
+    socket.onmessage = event => {
+      const data = JSON.parse(event.data);
+      log(`[<=] ${JSON.stringify(data, null, 2)}`);
+
+      switch (data.op) {
+        case 10: // Hello
+          const interval = data.d.heartbeat_interval;
+          heartbeatInterval = setInterval(() => {
+            socket.send(JSON.stringify({ op: 1, d: null }));
+            log("[=>] Heartbeat sent");
+          }, interval);
+
+          // IDENTIFY（ユーザートークンは絶対に晒さないこと！）
+          socket.send(JSON.stringify({
+            op: 2,
+            d: {
+              token: "ユーザートークンここに", // ⚠️危険 ⚠️
+              properties: {
+                "$os": "linux",
+                "$browser": "chrome",
+                "$device": "chrome"
+              },
+              capabilities: 61,
+              presence: {
+                status: "online",
+                since: 0,
+                activities: [],
+                afk: false
+              },
+              compress: false
+            }
+          }));
+          break;
+        case 11:
+          log("💓 Heartbeat ACK");
+          break;
+        case 0:
+          if (data.t === "READY") log("✅ 認証成功！");
+          if (data.t === "MESSAGE_CREATE") {
+            log(`📨 ${data.d.author.username}: ${data.d.content}`);
+          }
+          break;
+      }
+    };
+  </script>
+</body>
+</html>
