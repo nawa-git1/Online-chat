@@ -17,7 +17,7 @@
       flex: 1;
       display: flex;
       overflow: hidden;
-      margin-left: 0; /* サイドバー非表示時 */
+      margin-left: 0;
       transition: margin-left 0.3s ease;
     }
     #sidebar {
@@ -25,7 +25,7 @@
       background: #2c2f33;
       color: white;
       padding: 10px;
-      display: none; /* 初期は非表示 */
+      display: none;
       position: fixed;
       top: 50px;
       left: 0;
@@ -64,6 +64,7 @@
       border-radius: 6px;
       cursor: pointer;
       width: 100%;
+      box-sizing: border-box;
     }
     button:hover {
       background: #4752c4;
@@ -96,6 +97,9 @@
       padding: 6px 10px;
       border-radius: 6px;
       cursor: pointer;
+      width: 80px;
+      height: 30px;
+      font-size: 14px;
     }
     #historyBtn {
       right: 10px;
@@ -113,6 +117,8 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       display: none;
       z-index: 1000;
+      max-height: 300px;
+      overflow-y: auto;
     }
     #historyPanel h3 {
       margin: 0;
@@ -136,34 +142,38 @@
       color: #666;
       font-family: monospace;
       z-index: 1000;
+      display: none;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      max-width: 300px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <!-- メニュー開閉ボタン -->
-  <button id="sidebarToggleBtn">📂 メニュー</button>
-  <!-- 履歴ボタン -->
-  <button id="historyBtn">🗄️ 履歴</button>
+  <button id="sidebarToggleBtn">メニュー</button>
+  <button id="historyBtn">履歴</button>
   
-  <!-- サイドバー -->
   <div id="sidebar">
     <h3>📋 メニュー</h3>
+    <button id="showCreditBtn">クレジット表示</button>
     <button onclick="alert('メニュー1クリック！')">メニュー1</button>
     <button onclick="alert('メニュー2クリック！')">メニュー2</button>
     <button onclick="alert('メニュー3クリック！')">メニュー3</button>
   </div>
 
-  <!-- 履歴パネル -->
   <div id="historyPanel">
     <h3>最近のトークン</h3>
     <div id="historyList"></div>
   </div>
 
-  <!-- メインコンテンツ -->
   <div id="main">
     <div id="servers">
       <h2>🔑 トークン</h2>
-      <input id="tokenInput" type="password" placeholder="ユーザートークン" />
+      <input id="tokenInput" type="password" placeholder="ユーザートークン" autocomplete="off" />
       <button id="connectBtn">接続</button>
       <h2>📁 サーバー</h2>
       <div id="guildList"></div>
@@ -180,10 +190,8 @@
     </div>
   </div>
 
-  <!-- ログ表示 -->
   <div id="logArea"></div>
 
-  <!-- クレジット -->
   <div id="credit">© Discord Viewer v2+ - Powered by なわ</div>
 
   <script>
@@ -205,14 +213,14 @@
       const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
       const sidebar = document.getElementById("sidebar");
       const main = document.getElementById("main");
+      const credit = document.getElementById("credit");
+      const showCreditBtn = document.getElementById("showCreditBtn");
 
-      // 履歴パネルの表示切替
       historyBtn.onclick = () => {
         historyPanel.style.display = historyPanel.style.display === "block" ? "none" : "block";
         renderHistory();
       };
 
-      // トークン履歴描画
       function renderHistory() {
         const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
         historyList.innerHTML = "";
@@ -228,14 +236,12 @@
         });
       }
 
-      // トークン履歴保存
       function saveToken(token) {
         let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
         history = [token, ...history.filter(t => t !== token)].slice(0, 10);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
       }
 
-      // サイドバー表示切替
       sidebarToggleBtn.onclick = () => {
         if (sidebar.style.display === "block") {
           sidebar.style.display = "none";
@@ -248,7 +254,10 @@
         }
       };
 
-      // 以下、Discord WebSocket/API などのコードはそのまま
+      showCreditBtn.onclick = () => {
+        credit.style.display = credit.style.display === "block" ? "none" : "block";
+      };
+
       let socket = null;
       let token = "";
       let heartbeatInterval = null;
@@ -263,6 +272,7 @@
         socket.onmessage = event => {
           const data = JSON.parse(event.data);
           if (data.op === 10) {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
             heartbeatInterval = setInterval(() => {
               socket.send(JSON.stringify({ op: 1, d: null }));
             }, data.d.heartbeat_interval);
@@ -298,6 +308,8 @@
             }
           }
         };
+        socket.onerror = (e) => log("⚠️ WebSocketエラー", true);
+        socket.onclose = () => log("🔌 接続が切断されました");
       };
 
       function api(path, opts = {}) {
