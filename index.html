@@ -17,13 +17,15 @@
       flex: 1;
       display: flex;
       overflow: hidden;
+      margin-left: 0; /* サイドバー非表示時 */
+      transition: margin-left 0.3s ease;
     }
     #sidebar {
       width: 180px;
       background: #2c2f33;
       color: white;
       padding: 10px;
-      display: none;
+      display: none; /* 初期は非表示 */
       position: fixed;
       top: 50px;
       left: 0;
@@ -35,13 +37,20 @@
       background: #5865F2;
       width: 100%;
       margin: 6px 0;
+      border: none;
+      color: white;
+      padding: 6px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #sidebar button:hover {
+      background: #4752c4;
     }
     #servers, #channels, #chat {
       width: 33.3%;
       padding: 10px;
       overflow-y: auto;
       border-right: 1px solid #ccc;
-      margin-left: 180px; /* サイドバー分の余白 */
     }
     #chat {
       border-right: none;
@@ -73,23 +82,26 @@
       padding: 6px;
       font-family: monospace;
       border-top: 2px solid #444;
-      margin-left: 180px; /* サイドバー分の余白 */
+      margin-left: 0;
+      transition: margin-left 0.3s ease;
     }
     .error { color: #ff5555; }
     #historyBtn, #sidebarToggleBtn {
       position: fixed;
       top: 10px;
       z-index: 1100;
+      background: #5865F2;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
     }
     #historyBtn {
       right: 10px;
     }
     #sidebarToggleBtn {
       left: 10px;
-      background: #5865F2;
-      color: white;
-      border-radius: 6px;
-      padding: 6px 10px;
     }
     #historyPanel {
       position: fixed;
@@ -128,18 +140,26 @@
   </style>
 </head>
 <body>
+  <!-- メニュー開閉ボタン -->
   <button id="sidebarToggleBtn">📂 メニュー</button>
+  <!-- 履歴ボタン -->
   <button id="historyBtn">🗄️ 履歴</button>
-  <div id="historyPanel">
-    <h3>最近のトークン</h3>
-    <div id="historyList"></div>
-  </div>
+  
+  <!-- サイドバー -->
   <div id="sidebar">
     <h3>📋 メニュー</h3>
     <button onclick="alert('メニュー1クリック！')">メニュー1</button>
     <button onclick="alert('メニュー2クリック！')">メニュー2</button>
     <button onclick="alert('メニュー3クリック！')">メニュー3</button>
   </div>
+
+  <!-- 履歴パネル -->
+  <div id="historyPanel">
+    <h3>最近のトークン</h3>
+    <div id="historyList"></div>
+  </div>
+
+  <!-- メインコンテンツ -->
   <div id="main">
     <div id="servers">
       <h2>🔑 トークン</h2>
@@ -159,15 +179,20 @@
       <button id="sendBtn">送信</button>
     </div>
   </div>
+
+  <!-- ログ表示 -->
   <div id="logArea"></div>
+
+  <!-- クレジット -->
   <div id="credit">© Discord Viewer v2+ - Powered by なわ</div>
+
   <script>
     (() => {
+      const logArea = document.getElementById("logArea");
       const log = (msg, err = false) => {
         const el = document.createElement("div");
         el.textContent = msg;
         if (err) el.classList.add("error");
-        const logArea = document.getElementById("logArea");
         logArea.appendChild(el);
         logArea.scrollTop = logArea.scrollHeight;
       };
@@ -177,12 +202,17 @@
       const historyPanel = document.getElementById("historyPanel");
       const historyList = document.getElementById("historyList");
       const tokenInput = document.getElementById("tokenInput");
+      const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
+      const sidebar = document.getElementById("sidebar");
+      const main = document.getElementById("main");
 
+      // 履歴パネルの表示切替
       historyBtn.onclick = () => {
         historyPanel.style.display = historyPanel.style.display === "block" ? "none" : "block";
         renderHistory();
       };
 
+      // トークン履歴描画
       function renderHistory() {
         const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
         historyList.innerHTML = "";
@@ -198,31 +228,27 @@
         });
       }
 
+      // トークン履歴保存
       function saveToken(token) {
         let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
         history = [token, ...history.filter(t => t !== token)].slice(0, 10);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
       }
 
-      document.getElementById("sidebarToggleBtn").onclick = () => {
-        const sidebar = document.getElementById("sidebar");
+      // サイドバー表示切替
+      sidebarToggleBtn.onclick = () => {
         if (sidebar.style.display === "block") {
           sidebar.style.display = "none";
-          // サイドバー非表示時はmainのmargin戻す
-          document.getElementById("servers").style.marginLeft = "0";
-          document.getElementById("channels").style.marginLeft = "0";
-          document.getElementById("chat").style.marginLeft = "0";
-          document.getElementById("logArea").style.marginLeft = "0";
+          main.style.marginLeft = "0";
+          logArea.style.marginLeft = "0";
         } else {
           sidebar.style.display = "block";
-          // サイドバー表示時はmainのmarginを180px空ける
-          document.getElementById("servers").style.marginLeft = "180px";
-          document.getElementById("channels").style.marginLeft = "180px";
-          document.getElementById("chat").style.marginLeft = "180px";
-          document.getElementById("logArea").style.marginLeft = "180px";
+          main.style.marginLeft = "180px";
+          logArea.style.marginLeft = "180px";
         }
       };
 
+      // 以下、Discord WebSocket/API などのコードはそのまま
       let socket = null;
       let token = "";
       let heartbeatInterval = null;
