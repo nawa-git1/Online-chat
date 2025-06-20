@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Discord Viewer v2</title>
+  <title>Discord Viewer v2+</title>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
@@ -54,18 +54,52 @@
       font-family: monospace;
       border-top: 2px solid #444;
     }
-    .error {
-      color: #ff5555;
+    .error { color: #ff5555; }
+    #historyBtn {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+    }
+    #historyPanel {
+      position: fixed;
+      top: 50px;
+      right: 10px;
+      width: 250px;
+      background: white;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 1000;
+    }
+    #historyPanel h3 {
+      margin: 0;
+      padding: 8px;
+      background: #eee;
+      border-bottom: 1px solid #ccc;
+    }
+    .history-item {
+      padding: 6px 8px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+    }
+    .history-item:hover {
+      background: #f0f0f0;
     }
   </style>
 </head>
 <body>
+  <button id="historyBtn">🗄️ 履歴</button>
+  <div id="historyPanel">
+    <h3>最近のトークン</h3>
+    <div id="historyList"></div>
+  </div>
   <div id="main">
     <div id="servers">
       <h2>🔑 トークン</h2>
       <input id="tokenInput" type="password" placeholder="ユーザートークン" />
       <button id="connectBtn">接続</button>
-      <h2>🧭 サーバー</h2>
+      <h2>🗭 サーバー</h2>
       <div id="guildList"></div>
     </div>
     <div id="channels">
@@ -80,37 +114,54 @@
     </div>
   </div>
   <div id="logArea"></div>
-
   <script>
     (() => {
-      const logArea = document.getElementById("logArea");
       const log = (msg, err = false) => {
         const el = document.createElement("div");
         el.textContent = msg;
         if (err) el.classList.add("error");
-        logArea.appendChild(el);
-        logArea.scrollTop = logArea.scrollHeight;
+        document.getElementById("logArea").appendChild(el);
       };
+      const STORAGE_KEY = "tokenHistory";
+      const historyBtn = document.getElementById("historyBtn");
+      const historyPanel = document.getElementById("historyPanel");
+      const historyList = document.getElementById("historyList");
+      const tokenInput = document.getElementById("tokenInput");
+
+      historyBtn.onclick = () => {
+        historyPanel.style.display = historyPanel.style.display === "block" ? "none" : "block";
+        renderHistory();
+      };
+      function renderHistory() {
+        const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        historyList.innerHTML = "";
+        list.forEach(t => {
+          const div = document.createElement("div");
+          div.className = "history-item";
+          div.textContent = t.slice(0, 5) + "..." + t.slice(-5);
+          div.onclick = () => { tokenInput.value = t; historyPanel.style.display = "none"; };
+          historyList.appendChild(div);
+        });
+      }
+      function saveToken(token) {
+        let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        history = [token, ...history.filter(t => t !== token)].slice(0, 10);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      }
 
       let socket = null;
       let token = "";
       let heartbeatInterval = null;
       let currentChannelId = null;
 
-      function connect() {
-        token = document.getElementById("tokenInput").value.trim();
+      document.getElementById("connectBtn").onclick = () => {
+        token = tokenInput.value.trim();
         if (!token) return log("⚠️ トークンを入力してください", true);
-
+        saveToken(token);
         socket = new WebSocket("wss://gateway.discord.gg/?v=9&encoding=json");
         socket.onopen = () => log("🌐 接続成功！");
-        socket.onerror = (e) => log("❌ WebSocketエラー", true);
-        socket.onclose = (e) => {
-          log("🔴 接続終了", true);
-          if (heartbeatInterval) clearInterval(heartbeatInterval);
-        };
-
-        socket.onmessage = (event) => {
-          let data = JSON.parse(event.data);
+        socket.onmessage = event => {
+          const data = JSON.parse(event.data);
           if (data.op === 10) {
             heartbeatInterval = setInterval(() => {
               socket.send(JSON.stringify({ op: 1, d: null }));
@@ -119,15 +170,10 @@
               op: 2,
               d: {
                 token,
-                properties: {
-                  "$os": "linux",
-                  "$browser": "chrome",
-                  "$device": "chrome"
-                }
+                properties: { "$os": "linux", "$browser": "chrome", "$device": "chrome" }
               }
             }));
           }
-
           if (data.op === 0) {
             switch (data.t) {
               case "READY":
@@ -142,44 +188,17 @@
                   guildList.appendChild(b);
                 });
                 break;
-
-              case "CHANNEL_CREATE":
-                const chbtn = document.createElement("button");
-                chbtn.textContent = "#" + data.d.name;
-                chbtn.onclick = () => openChannel(data.d.id);
-                document.getElementById("channelList").appendChild(chbtn);
-                break;
-
               case "MESSAGE_CREATE":
                 if (data.d.channel_id === currentChannelId) {
                   const msg = document.createElement("div");
-                  msg.id = "msg-" + data.d.id;
-                  msg.textContent = `${data.d.author.username}: ${data.d.content}`;
+                  msg.textContent = `${data.d.author.username}: ${data.d.content}` + (data.d.pinned ? " 📌" : "");
                   document.getElementById("messageList").appendChild(msg);
                 }
-                break;
-
-              case "MESSAGE_UPDATE":
-                const updated = document.getElementById("msg-" + data.d.id);
-                if (updated) updated.textContent = `(編集済) ${data.d.content}`;
-                break;
-
-              case "MESSAGE_DELETE":
-                const del = document.getElementById("msg-" + data.d.id);
-                if (del) {
-                  del.textContent = "(削除済みのメッセージ)";
-                  del.style.color = "#aaa";
-                }
-                break;
-
-              case "MESSAGE_REACTION_ADD":
-                const reacted = document.getElementById("msg-" + data.d.message_id);
-                if (reacted) reacted.textContent += ` ❤️ [${data.d.emoji.name}]`;
                 break;
             }
           }
         };
-      }
+      };
 
       function api(path, opts = {}) {
         return fetch(`https://discord.com/api/v9/${path}`, {
@@ -211,14 +230,13 @@
         api(`channels/${chId}/messages?limit=20`).then(msgs => {
           msgs.reverse().forEach(m => {
             const div = document.createElement("div");
-            div.id = "msg-" + m.id;
-            div.textContent = `${m.author.username}: ${m.content}`;
+            div.textContent = `${m.author.username}: ${m.content}` + (m.pinned ? " 📌" : "");
             msgList.appendChild(div);
           });
         });
       }
 
-      function sendMessage() {
+      document.getElementById("sendBtn").onclick = () => {
         const input = document.getElementById("messageInput");
         const content = input.value.trim();
         if (!currentChannelId || !content) return;
@@ -229,10 +247,7 @@
           input.value = "";
           log("📤 メッセージ送信");
         });
-      }
-
-      document.getElementById("connectBtn").onclick = connect;
-      document.getElementById("sendBtn").onclick = sendMessage;
+      };
     })();
   </script>
 </body>
