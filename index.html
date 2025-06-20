@@ -1,9 +1,7 @@
-# Prepare the full HTML content with JavaScript logic included
-html_content = """
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Discord Viewer v2+</title>
   <style>
     body {
@@ -26,12 +24,24 @@ html_content = """
       color: white;
       padding: 10px;
       display: none;
+      position: fixed;
+      top: 50px;
+      left: 0;
+      bottom: 0;
+      overflow-y: auto;
+      z-index: 1000;
+    }
+    #sidebar button {
+      background: #5865F2;
+      width: 100%;
+      margin: 6px 0;
     }
     #servers, #channels, #chat {
       width: 33.3%;
       padding: 10px;
       overflow-y: auto;
       border-right: 1px solid #ccc;
+      margin-left: 180px; /* サイドバー分の余白 */
     }
     #chat {
       border-right: none;
@@ -63,18 +73,23 @@ html_content = """
       padding: 6px;
       font-family: monospace;
       border-top: 2px solid #444;
+      margin-left: 180px; /* サイドバー分の余白 */
     }
     .error { color: #ff5555; }
     #historyBtn, #sidebarToggleBtn {
       position: fixed;
       top: 10px;
-      z-index: 1000;
+      z-index: 1100;
     }
     #historyBtn {
       right: 10px;
     }
     #sidebarToggleBtn {
       left: 10px;
+      background: #5865F2;
+      color: white;
+      border-radius: 6px;
+      padding: 6px 10px;
     }
     #historyPanel {
       position: fixed;
@@ -108,82 +123,24 @@ html_content = """
       font-size: 12px;
       color: #666;
       font-family: monospace;
+      z-index: 1000;
     }
   </style>
 </head>
 <body>
-  <style>
-  #sidebar {
-    width: 180px;
-    background: #2c2f33;
-    color: white;
-    padding: 10px;
-    display: none;
-    position: fixed;
-    top: 50px;
-    left: 0;
-    bottom: 0;
-    overflow-y: auto;
-    z-index: 1000;
-  }
-  #sidebar button {
-    background: #5865F2;
-    width: 100%;
-    margin: 6px 0;
-  }
-  #sidebarToggleBtn {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    z-index: 1100;
-    background: #5865F2;
-    color: white;
-    border: none;
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  #credit {
-    position: fixed;
-    bottom: 5px;
-    left: 10px;
-    font-size: 12px;
-    color: #666;
-    font-family: monospace;
-    z-index: 1000;
-  }
-</style>
-
-<button id="sidebarToggleBtn">📂 メニュー</button>
-
-<div id="sidebar">
-  <h3>📋 メニュー</h3>
-  <button onclick="alert('メニュー1クリック！')">メニュー1</button>
-  <button onclick="alert('メニュー2クリック！')">メニュー2</button>
-  <button onclick="alert('メニュー3クリック！')">メニュー3</button>
-</div>
-
-<div id="credit">© Discord Viewer v2+ - Powered by なわ</div>
-
-<script>
-  document.getElementById("sidebarToggleBtn").onclick = () => {
-    const sidebar = document.getElementById("sidebar");
-    sidebar.style.display = (sidebar.style.display === "block") ? "none" : "block";
-  };
-</script>
   <button id="sidebarToggleBtn">📂 メニュー</button>
   <button id="historyBtn">🗄️ 履歴</button>
   <div id="historyPanel">
     <h3>最近のトークン</h3>
     <div id="historyList"></div>
   </div>
+  <div id="sidebar">
+    <h3>📋 メニュー</h3>
+    <button onclick="alert('メニュー1クリック！')">メニュー1</button>
+    <button onclick="alert('メニュー2クリック！')">メニュー2</button>
+    <button onclick="alert('メニュー3クリック！')">メニュー3</button>
+  </div>
   <div id="main">
-    <div id="sidebar">
-      <h3>📋 メニュー</h3>
-      <button onclick="alert('メニュー1クリック！')">メニュー1</button>
-      <button onclick="alert('メニュー2クリック！')">メニュー2</button>
-      <button onclick="alert('メニュー3クリック！')">メニュー3</button>
-    </div>
     <div id="servers">
       <h2>🔑 トークン</h2>
       <input id="tokenInput" type="password" placeholder="ユーザートークン" />
@@ -210,8 +167,9 @@ html_content = """
         const el = document.createElement("div");
         el.textContent = msg;
         if (err) el.classList.add("error");
-        document.getElementById("logArea").appendChild(el);
-        document.getElementById("logArea").scrollTop = document.getElementById("logArea").scrollHeight;
+        const logArea = document.getElementById("logArea");
+        logArea.appendChild(el);
+        logArea.scrollTop = logArea.scrollHeight;
       };
 
       const STORAGE_KEY = "tokenHistory";
@@ -248,7 +206,21 @@ html_content = """
 
       document.getElementById("sidebarToggleBtn").onclick = () => {
         const sidebar = document.getElementById("sidebar");
-        sidebar.style.display = sidebar.style.display === "block" ? "none" : "block";
+        if (sidebar.style.display === "block") {
+          sidebar.style.display = "none";
+          // サイドバー非表示時はmainのmargin戻す
+          document.getElementById("servers").style.marginLeft = "0";
+          document.getElementById("channels").style.marginLeft = "0";
+          document.getElementById("chat").style.marginLeft = "0";
+          document.getElementById("logArea").style.marginLeft = "0";
+        } else {
+          sidebar.style.display = "block";
+          // サイドバー表示時はmainのmarginを180px空ける
+          document.getElementById("servers").style.marginLeft = "180px";
+          document.getElementById("channels").style.marginLeft = "180px";
+          document.getElementById("chat").style.marginLeft = "180px";
+          document.getElementById("logArea").style.marginLeft = "180px";
+        }
       };
 
       let socket = null;
@@ -354,11 +326,3 @@ html_content = """
   </script>
 </body>
 </html>
-"""
-
-# Save to a downloadable file
-path = "/mnt/data/discord_viewer_v2_plus.html"
-with open(path, "w", encoding="utf-8") as f:
-    f.write(html_content)
-
-path
